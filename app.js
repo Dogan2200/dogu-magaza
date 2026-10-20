@@ -1,86 +1,110 @@
-/* DOĞU — örnek mağaza: katalog, ürün detayı, sepet (tarayıcıda saklanır) */
+/* DOĞU — örnek giyim mağazası: katalog, renk/beden seçimi, sepet (tarayıcıda saklanır) */
 (() => {
   'use strict';
   const P = window.DOGU_PRODUCTS || [], CATS = window.DOGU_CATS || [];
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const tl = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
-  const TL = n => tl.format(Math.round(n)) + ' ₺';
-  const FREE_SHIP = 1500, SHIP = 89;
-  const KEY = 'DOGU_CART_V1';
+  const nf = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
+  const TL = n => nf.format(Math.round(n)) + ' ₺';
+  const FREE_SHIP = 1500, SHIP = 79, KEY = 'DOGU_CART_V2';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let uid = 0;
 
-  /* ---------- Çizimler: her ürün kendi çini deseniyle ---------- */
-  const star = (cx, cy, s, attrs) => {             // sekiz köşeli Selçuklu yıldızı (iki kare)
-    const h = s / 2;
-    return `<g ${attrs}><rect x="${cx - h}" y="${cy - h}" width="${s}" height="${s}"/><rect x="${cx - h}" y="${cy - h}" width="${s}" height="${s}" transform="rotate(45 ${cx} ${cy})"/></g>`;
-  };
-  const MOTIF = {
-    yildiz: ([a, b, c]) => star(200, 200, 150, `fill="${a}"`) + star(200, 200, 84, `fill="#fff"`) + star(200, 200, 56, `fill="${c}"`) + `<circle cx="200" cy="200" r="12" fill="${b}"/>`,
-    lale: ([a, b, c]) => `<path d="M200 300 C198 260 200 230 200 196" stroke="${b}" stroke-width="7" fill="none" stroke-linecap="round"/>
-      <path d="M200 286 C170 280 150 254 146 226 C176 232 196 252 200 286Z M200 266 C226 260 244 240 250 214 C224 220 204 238 200 266Z" fill="${b}"/>
-      <path d="M200 200 C176 196 160 172 164 132 C178 146 188 156 200 176 C212 156 222 146 236 132 C240 172 224 196 200 200Z" fill="${c}"/>
-      <path d="M200 182 C192 160 192 134 200 104 C208 134 208 160 200 182Z" fill="${a}"/>`,
-    cintemani: ([a, b, c]) => `<g fill="${b}"><circle cx="172" cy="150" r="22"/><circle cx="228" cy="150" r="22"/><circle cx="200" cy="196" r="22"/></g>
-      <g fill="none" stroke="${a}" stroke-width="9" stroke-linecap="round"><path d="M136 240 q16 -16 32 0 t32 0 t32 0 t32 0"/><path d="M136 270 q16 -16 32 0 t32 0 t32 0 t32 0"/></g>`,
-    dalga: ([a, b]) => `<g fill="none" stroke-linecap="round" stroke-width="10">${[0, 1, 2, 3].map(i => `<path stroke="${i % 2 ? b : a}" d="M108 ${150 + i * 32} q23 -22 46 0 t46 0 t46 0 t46 0"/>`).join('')}</g>`,
-    gul: ([a, b, c]) => `${Array.from({ length: 8 }, (_, i) => { const t = i * Math.PI / 4; return `<circle cx="${200 + Math.cos(t) * 56}" cy="${200 + Math.sin(t) * 56}" r="30" fill="${i % 2 ? b : a}"/>`; }).join('')}<circle cx="200" cy="200" r="34" fill="#fff"/><circle cx="200" cy="200" r="20" fill="${c}"/>`,
-    elibelinde: ([a, b, c]) => `<path d="M200 112 L248 160 L222 200 L248 240 L200 288 L152 240 L178 200 L152 160Z" fill="${a}"/><path d="M200 150 L222 200 L200 250 L178 200Z" fill="${c}"/>
-      <g fill="${b}"><rect x="118" y="190" width="20" height="20" transform="rotate(45 128 200)"/><rect x="262" y="190" width="20" height="20" transform="rotate(45 272 200)"/></g>`,
-    nar: ([a, b, c]) => `<circle cx="200" cy="214" r="74" fill="${a}"/><path d="M178 146 L186 126 L200 140 L214 126 L222 146Z" fill="${a}"/>
-      <g fill="#fff">${[[176, 196], [200, 190], [224, 196], [188, 222], [212, 222], [200, 248]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="7" ry="10"/>`).join('')}</g><path d="M232 146 C252 128 276 130 286 146 C266 154 248 154 232 146Z" fill="${b}"/>`,
-    nazar: ([a, b]) => `<circle cx="200" cy="200" r="92" fill="${a}"/><circle cx="200" cy="200" r="62" fill="#fff"/><circle cx="200" cy="200" r="42" fill="${b}"/><circle cx="200" cy="200" r="20" fill="#121a33"/>`,
-  };
-  function art(p, id) {
-    const [a, b, c] = p.colors, pid = 'pt-' + id;
-    if (p.motif === 'cizgi') {                        // dokuma: çizgili kumaş yüzeyi
-      const bands = [a, '#fff', b, '#fff', a, c, a, '#fff', b, '#fff', a];
-      return `<svg viewBox="0 0 400 400" role="img" aria-label="${esc(p.name)} deseni"><rect width="400" height="400" fill="${c}"/>
-        ${bands.map((col, i) => `<rect x="0" y="${30 + i * 31}" width="400" height="${i % 2 ? 9 : 22}" fill="${col}"/>`).join('')}
-        <g stroke="#fff" stroke-width="2" opacity=".55">${Array.from({ length: 40 }, (_, i) => `<line x1="${8 + i * 10}" y1="372" x2="${8 + i * 10}" y2="400"/>`).join('')}</g></svg>`;
+  /* ---------- Kıyafet çizimleri (düz illüstrasyon, 400×500) ---------- */
+  const LINE = 'stroke="rgba(0,0,0,.22)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"';
+  function fabric(id, f, c) {
+    const hex = c.hex, alt = c.alt || '#ffffff';
+    const P = (w, h, body) => `<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">${body}</pattern>`;
+    switch (f) {
+      case 'stripe': return P(18, 18, `<rect width="18" height="18" fill="${c.alt ? hex : hex}"/><rect width="6" height="18" fill="${c.alt ? alt : 'rgba(255,255,255,.35)'}"/>`);
+      case 'check': return P(36, 36, `<rect width="36" height="36" fill="${hex}"/><rect width="36" height="5" y="15" fill="${c.alt || 'rgba(255,255,255,.16)'}" opacity="${c.alt ? .85 : 1}"/><rect width="5" height="36" x="15" fill="${c.alt || 'rgba(255,255,255,.16)'}" opacity="${c.alt ? .85 : 1}"/><rect width="36" height="1.5" y="30" fill="rgba(0,0,0,.18)"/>`);
+      case 'rib': return P(9, 9, `<rect width="9" height="9" fill="${hex}"/><rect width="3" height="9" fill="rgba(0,0,0,.13)"/>`);
+      case 'denim': return P(8, 8, `<rect width="8" height="8" fill="${hex}"/><path d="M0 8 L8 0" stroke="rgba(255,255,255,.14)" stroke-width="2"/>`);
+      default: return P(400, 500, `<rect width="400" height="500" fill="${hex}"/>`);
     }
-    return `<svg viewBox="0 0 400 400" role="img" aria-label="${esc(p.name)} deseni">
-      <defs><pattern id="${pid}" width="50" height="50" patternUnits="userSpaceOnUse">${star(25, 25, 16, 'fill="#fff" opacity=".13"')}</pattern></defs>
-      <rect width="400" height="400" fill="${a}"/><rect width="400" height="400" fill="url(#${pid})"/>
-      <rect x="18" y="18" width="364" height="364" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>
-      <circle cx="200" cy="200" r="132" fill="#fff"/><circle cx="200" cy="200" r="132" fill="none" stroke="${b}" stroke-width="5"/>
-      ${(MOTIF[p.motif] || MOTIF.yildiz)(p.colors)}</svg>`;
+  }
+  const TOP = (hem, long, flare = 0) => long
+    ? `M170 96 Q200 116 230 96 L276 112 L318 158 L340 ${hem - 40} L304 ${hem - 32} L282 210 L${280 + flare} ${hem} L${120 - flare} ${hem} L118 210 L96 ${hem - 32} L60 ${hem - 40} L82 158 L124 112 Z`
+    : `M170 96 Q200 116 230 96 L276 112 L324 168 L294 196 L280 184 L280 ${hem} L120 ${hem} L120 184 L106 196 L76 168 L124 112 Z`;
+  const DRAW = {
+    coat: (fill, p) => `<path d="${TOP(452, true, 18)}" fill="${fill}" ${LINE}/>
+      <path d="M170 96 L200 190 L230 96" fill="none" ${LINE}/><path d="M200 190 L200 452" ${LINE}/>
+      <path d="M170 96 L150 150 L184 168" fill="none" ${LINE}/><path d="M230 96 L250 150 L216 168" fill="none" ${LINE}/>
+      ${p.id === 'civit-trenc' ? `<rect x="118" y="262" width="164" height="16" fill="rgba(0,0,0,.18)"/><rect x="190" y="258" width="20" height="24" fill="none" ${LINE}/>` : ''}
+      <g fill="rgba(0,0,0,.3)">${[210, 240, 300, 330].map(y => `<circle cx="184" cy="${y}" r="4"/><circle cx="216" cy="${y}" r="4"/>`).join('')}</g>
+      <path d="M134 340 h40 M226 340 h40" ${LINE}/>`,
+    jacket: (fill) => `<path d="${TOP(332, true, 4)}" fill="${fill}" ${LINE}/>
+      <path d="M170 96 L200 140 L230 96" fill="none" ${LINE}/><path d="M200 140 V332" ${LINE}/>
+      <path d="M132 170 h44 v34 h-44 Z M224 170 h44 v34 h-44 Z" fill="none" ${LINE}/>
+      <path d="M118 300 h164" ${LINE}/><g fill="#c9a24a">${[160, 210, 260, 310].map(y => `<circle cx="208" cy="${y}" r="4"/>`).join('')}</g>`,
+    shirt: (fill) => `<path d="${TOP(392, true)}" fill="${fill}" ${LINE}/>
+      <path d="M170 96 L186 128 L200 112 L214 128 L230 96" fill="#fff" ${LINE}/><path d="M200 112 V392" ${LINE}/>
+      <g fill="rgba(0,0,0,.28)">${[150, 195, 240, 285, 330].map(y => `<circle cx="207" cy="${y}" r="3.5"/>`).join('')}</g>
+      <path d="M140 150 h34 v30 h-34" fill="none" ${LINE}/>`,
+    tee: (fill) => `<path d="${TOP(392, false)}" fill="${fill}" ${LINE}/><path d="M172 98 Q200 126 228 98" fill="none" ${LINE}/>`,
+    knit: (fill) => `<path d="${TOP(380, true)}" fill="${fill}" ${LINE}/>
+      <rect x="166" y="62" width="68" height="46" rx="6" fill="${fill}" ${LINE}/>
+      <path d="M120 360 H280 M98 330 L62 322 M302 330 L338 322" ${LINE}/>`,
+    hoodie: (fill) => `<path d="M150 112 Q140 50 200 44 Q260 50 250 112 Z" fill="${fill}" ${LINE}/>
+      <path d="${TOP(384, true, 6)}" fill="${fill}" ${LINE}/>
+      <path d="M170 100 Q200 140 230 100" fill="rgba(0,0,0,.12)" ${LINE}/>
+      <path d="M186 120 v40 M214 120 v40" ${LINE}/>
+      <path d="M146 290 h108 l14 56 h-136 Z" fill="none" ${LINE}/>`,
+    trousers: (fill, p) => `<path d="M126 70 H274 L${p.id === 'genis-paca' ? 312 : 290} 462 H${p.id === 'genis-paca' ? 214 : 214} L200 200 L${p.id === 'genis-paca' ? 186 : 186} 462 H${p.id === 'genis-paca' ? 88 : 110} Z" fill="${fill}" ${LINE}/>
+      <path d="M126 92 H274" ${LINE}/><path d="M200 92 V180" ${LINE}/>
+      ${p.id === 'kargo' ? `<path d="M118 250 h44 v54 h-44 Z M282 250 h-44 v54 h44 Z" fill="none" ${LINE}/>` : `<path d="M160 92 L168 300 M240 92 L232 300" ${LINE} opacity=".6"/>`}`,
+    skirt: (fill) => `<rect x="134" y="96" width="132" height="26" fill="${fill}" ${LINE}/>
+      <path d="M134 122 H266 L316 430 H84 Z" fill="${fill}" ${LINE}/>
+      <g ${LINE} opacity=".7">${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => { const t = (i + 1) / 10; return `<path d="M${134 + 132 * t} 124 L${84 + 232 * t} 428"/>`; }).join('')}</g>`,
+    scarf: (fill) => `<path d="M150 70 H250 L262 400 H162 Z" fill="${fill}" ${LINE}/>
+      <path d="M150 70 Q200 130 250 70" fill="rgba(0,0,0,.12)"/>
+      <g ${LINE}>${Array.from({ length: 12 }, (_, i) => `<path d="M${166 + i * 8.5} 400 v34"/>`).join('')}</g>`,
+    beanie: (fill) => `<path d="M118 330 Q118 150 200 150 Q282 150 282 330 Z" fill="${fill}" ${LINE}/>
+      <rect x="110" y="300" width="180" height="66" rx="8" fill="${fill}" ${LINE}/><rect x="110" y="300" width="180" height="66" rx="8" fill="rgba(0,0,0,.08)"/>
+      <rect x="182" y="318" width="36" height="28" rx="2" fill="#fff" opacity=".9"/>`,
+  };
+  function art(p, ci = 0, opts = {}) {
+    const c = p.colors[ci] || p.colors[0], id = 'f' + (++uid);
+    const label = opts.decorative ? 'aria-hidden="true"' : `role="img" aria-label="${esc(p.name)}, ${esc(c.name)}"`;
+    return `<svg viewBox="0 0 400 500" ${label}><defs>${fabric(id, p.fabric, c)}</defs>
+      ${opts.bg === false ? '' : '<rect width="400" height="500" fill="#eceef1"/>'}
+      <g>${(DRAW[p.type] || DRAW.tee)(`url(#${id})`, p)}</g></svg>`;
   }
 
-  /* Hero: yıldız-haç geçmeli çini yüzeyi; tek mercan yıldız */
-  function hero() {
-    const el = $('#heroTile'); if (!el) return;
-    const S = 120, out = [];
-    out.push('<rect width="480" height="480" fill="#f2f4f9"/>');
-    for (let y = 0; y <= 4; y++) for (let x = 0; x <= 4; x++) {
-      const cx = x * S, cy = y * S, hot = x === 3 && y === 1, d = reduce ? 0 : (x + y) * 70;
-      out.push(`<g class="t-star" style="${reduce ? '' : `opacity:0;animation:tin .6s ${d}ms forwards`}">${star(cx, cy, 84, `fill="${hot ? '#c8372d' : '#1f3a93'}"`)}${star(cx, cy, 44, 'fill="#fff"')}<circle cx="${cx}" cy="${cy}" r="9" fill="${hot ? '#1f3a93' : '#c8372d'}"/></g>`);
-    }
-    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
-      const cx = x * S + S / 2, cy = y * S + S / 2;
-      out.push(`<rect x="${cx - 9}" y="${cy - 9}" width="18" height="18" transform="rotate(45 ${cx} ${cy})" fill="#1f7f7c"/>`);
-    }
-    el.innerHTML = `<style>@keyframes tin{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}</style>` + out.join('');
+  /* Hero: askılıkta asılı kıyafetler, açılışta bir kez sallanır */
+  function rail() {
+    const el = $('#rail'); if (!el) return;
+    const picks = [['civit-trenc', 0], ['balikci-triko', 2], ['keten-gomlek', 0], ['denim-ceket', 0], ['yun-kaban', 1], ['pileli-etek', 0], ['agir-tisort', 2]];
+    const W = 1200, n = picks.length, gap = W / n;
+    let s = `<style>@keyframes sway{0%{transform:rotate(0)}25%{transform:rotate(3deg)}55%{transform:rotate(-2deg)}80%{transform:rotate(1deg)}100%{transform:rotate(0)}}</style>
+      <rect x="0" y="22" width="${W}" height="8" rx="4" fill="#262d63"/>`;
+    picks.forEach(([id, ci], i) => {
+      const p = P.find(x => x.id === id); if (!p) return;
+      const cx = gap * i + gap / 2, sc = .62, d = reduce ? '' : `animation:sway 2.4s ${i * 90}ms cubic-bezier(.3,.6,.3,1) both;`;
+      s += `<g class="hang" style="transform-origin:${cx}px 26px;${d}">
+        <path d="M${cx} 26 v10 q0 8 -8 8" fill="none" stroke="#5b5f6b" stroke-width="3" stroke-linecap="round"/>
+        <path d="M${cx - 62} 78 L${cx} 44 L${cx + 62} 78" fill="none" stroke="#5b5f6b" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+        <g transform="translate(${cx - 200 * sc} ${16}) scale(${sc})">${art(p, ci, { bg: false, decorative: true }).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</g></g>`;
+    });
+    el.innerHTML = s;
   }
 
-  /* ---------- Sepet durumu ---------- */
-  let cart = {};
-  try { cart = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { cart = {}; }
+  /* ---------- Sepet ---------- */
+  let cart = [];
+  try { cart = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { cart = []; }
+  cart = cart.filter(l => P.some(p => p.id === l.id));
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cart)); } catch (e) {} };
   const byId = id => P.find(p => p.id === id);
-  const lines = () => Object.entries(cart).map(([id, q]) => ({ p: byId(id), q })).filter(x => x.p && x.q > 0);
-  const count = () => lines().reduce((s, x) => s + x.q, 0);
-  const subtotal = () => lines().reduce((s, x) => s + x.p.price * x.q, 0);
-
-  function add(id, q = 1) {
-    cart[id] = Math.min(20, (cart[id] || 0) + q); save(); paintCount();
-    const p = byId(id); toast(`${p.name} sepete eklendi`);
+  const count = () => cart.reduce((s, l) => s + l.q, 0);
+  const subtotal = () => cart.reduce((s, l) => s + byId(l.id).price * l.q, 0);
+  function add(id, ci, size, q = 1) {
+    const l = cart.find(x => x.id === id && x.ci === ci && x.size === size);
+    if (l) l.q = Math.min(10, l.q + q); else cart.push({ id, ci, size, q });
+    save(); paintCount();
+    const p = byId(id); toast(`${p.name} (${size}) sepete eklendi`);
   }
-  function setQty(id, q) { if (q <= 0) delete cart[id]; else cart[id] = Math.min(20, q); save(); paintCount(); renderCart(); }
-
   function paintCount() {
-    const b = $('#cartOpen'); $('#cartCount').textContent = count();
-    b.setAttribute('aria-label', `Sepet, ${count()} ürün`);
+    const b = $('#cartOpen'); $('#cartCount').textContent = count(); b.setAttribute('aria-label', `Sepet, ${count()} ürün`);
     if (!reduce) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   }
 
@@ -96,48 +120,49 @@
     if (sort === 'azalan') list = list.slice().sort((a, b) => b.price - a.price);
     const cn = CATS.find(c => c.id === cat)?.name || '';
     $('#resultInfo').textContent = cat === 'hepsi' ? `${list.length} ürün` : `${cn}: ${list.length} ürün`;
-    $('#grid').innerHTML = list.length ? list.map((p, i) => `<li class="card">
-        <button class="card-art" type="button" data-open="${p.id}" aria-label="${esc(p.name)} ayrıntıları">${art(p, 'g' + i)}</button>
-        <p class="card-region">${esc(p.region)} · ${esc(p.craft)}</p>
+    $('#grid').innerHTML = list.length ? list.map(p => `<li class="card">
+        <button class="card-art" type="button" data-open="${p.id}" aria-label="${esc(p.name)} ayrıntıları">${art(p, 0, { decorative: true })}${p.tag ? `<span class="tag">${esc(p.tag)}</span>` : ''}</button>
         <h3><button type="button" data-open="${p.id}">${esc(p.name)}</button></h3>
-        <div class="card-row"><span class="price">${TL(p.price)}</span><button class="add" type="button" data-add="${p.id}">Sepete ekle</button></div>
+        <div class="card-row"><span class="price">${TL(p.price)}</span>
+          <span class="dots" aria-label="${p.colors.length} renk">${p.colors.map(c => `<i style="background:${c.hex}" title="${esc(c.name)}"></i>`).join('')}</span></div>
       </li>`).join('') : '<li class="empty">Bu kategoride ürün yok. Başka bir kategori seçin.</li>';
   }
   function setCat(c) { cat = c; renderCats(); renderGrid(); }
 
-  /* ---------- Ürün detayı ---------- */
-  let cur = null, qty = 1;
+  /* ---------- Ürün ayrıntısı ---------- */
+  let cur = null, ci = 0, size = null;
+  function paintDetail() {
+    $('#dArt').innerHTML = art(cur, ci);
+    $('#dColorName').textContent = cur.colors[ci].name;
+    $('#dColors').innerHTML = cur.colors.map((c, i) => `<button type="button" data-ci="${i}" aria-pressed="${i === ci}" aria-label="${esc(c.name)}" style="background:${c.alt ? `linear-gradient(135deg,${c.hex} 50%,${c.alt} 50%)` : c.hex}"></button>`).join('');
+    $('#dSizes').innerHTML = cur.sizes.map(s => `<button type="button" data-size="${esc(s)}" aria-pressed="${s === size}">${esc(s)}</button>`).join('');
+  }
   function openDetail(id) {
-    cur = byId(id); if (!cur) return; qty = 1;
-    $('#dArt').innerHTML = art(cur, 'd');
-    $('#dOrigin').textContent = `${cur.region} · ${cur.craft}`;
-    $('#dTitle').textContent = cur.name;
-    $('#dPrice').textContent = TL(cur.price);
-    $('#dDesc').textContent = cur.desc;
-    $('#dSize').textContent = cur.size;
-    $('#dCraft').textContent = cur.craft;
-    $('#qVal').textContent = qty;
-    $('#detail').showModal();
+    cur = byId(id); if (!cur) return; ci = 0; size = cur.sizes.length === 1 ? cur.sizes[0] : null;
+    $('#dTitle').textContent = cur.name; $('#dPrice').textContent = TL(cur.price); $('#dDesc').textContent = cur.desc;
+    $('#dMat').textContent = cur.material; $('#dFit').textContent = cur.fit; $('#dHint').textContent = '';
+    paintDetail(); $('#detail').showModal();
   }
 
   /* ---------- Sepet çekmecesi ---------- */
   let done = false;
   function renderCart() {
-    const L = lines(), body = $('#cartBody'), foot = $('#cartFoot');
+    const body = $('#cartBody'), foot = $('#cartFoot');
     if (done) {
-      body.innerHTML = `<div class="done"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="#1f3a93"><rect x="18" y="18" width="28" height="28"/><rect x="18" y="18" width="28" height="28" transform="rotate(45 32 32)"/></g><path d="M23 33l6 6 12-13" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      body.innerHTML = `<div class="done"><svg viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="28" fill="#262d63"/><path d="M17 29l7 7 15-16" stroke="#e0a526" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <h3>Siparişiniz tamamlandı</h3><p>Bu örnek mağazada sipariş oluşturulmaz ve ödeme alınmaz. Sepetiniz temizlendi.</p>
         <button class="btn ghost" type="button" data-close>Alışverişe dön</button></div>`;
       foot.innerHTML = ''; return;
     }
-    if (!L.length) {
+    if (!cart.length) {
       body.innerHTML = `<div class="cart-empty"><p>Sepetiniz boş. Koleksiyondan bir parça seçerek başlayın.</p><button class="btn primary" type="button" data-close data-go="urunler">Koleksiyonu gör</button></div>`;
       foot.innerHTML = ''; return;
     }
-    body.innerHTML = L.map(({ p, q }, i) => `<div class="line">${art(p, 'c' + i)}
-        <div><h3>${esc(p.name)}</h3><small>${esc(p.region)} · ${TL(p.price)}</small>
-          <div class="qty" role="group" aria-label="${esc(p.name)} adedi"><button type="button" data-q="${p.id}" data-d="-1" aria-label="Bir azalt">−</button><output>${q}</output><button type="button" data-q="${p.id}" data-d="1" aria-label="Bir artır">+</button></div></div>
-        <div><div class="lp">${TL(p.price * q)}</div><button class="rm" type="button" data-rm="${p.id}">Kaldır</button></div></div>`).join('');
+    body.innerHTML = cart.map((l, i) => { const p = byId(l.id), c = p.colors[l.ci] || p.colors[0];
+      return `<div class="line"><div class="thumb">${art(p, l.ci, { decorative: true })}</div>
+        <div><h3>${esc(p.name)}</h3><small>${esc(c.name)} · ${l.size === 'Tek beden' ? 'Tek beden' : 'Beden ' + esc(l.size)}</small>
+          <div class="qty" role="group" aria-label="${esc(p.name)} adedi"><button type="button" data-q="${i}" data-d="-1" aria-label="Bir azalt">−</button><output>${l.q}</output><button type="button" data-q="${i}" data-d="1" aria-label="Bir artır">+</button></div></div>
+        <div><div class="lp">${TL(p.price * l.q)}</div><button class="rm" type="button" data-rm="${i}">Kaldır</button></div></div>`; }).join('');
     const sub = subtotal(), ship = sub >= FREE_SHIP ? 0 : SHIP, left = FREE_SHIP - sub;
     foot.innerHTML = `<div class="sumrow"><span>Ara toplam</span><span>${TL(sub)}</span></div>
       <div class="sumrow"><span>Kargo</span><span>${ship ? TL(ship) : 'Ücretsiz'}</span></div>
@@ -146,23 +171,7 @@
       <div class="shipbar" aria-hidden="true"><i style="width:${Math.min(100, sub / FREE_SHIP * 100)}%"></i></div>
       <button class="btn primary" type="button" id="checkout">Siparişi tamamla</button>`;
   }
-  function openCart() { done = false; renderCart(); $('#cart').showModal(); }
 
-  /* ---------- Ustalar ---------- */
-  const REGIONS = [
-    { n: 'Kütahya', w: 'Çini ve el boyaması seramik', t: 'Sıraltı boyamanın sürdüğü atölyelerden kase, fincan ve mumluklar. Her desen fırçayla, tek tek çizilir.', c: 'seramik' },
-    { n: 'İznik', w: 'Kuvars çini', t: 'Kuvars ağırlıklı hamuruyla bilinen geleneğin bugünkü ustalarından tabak ve vazolar.', c: 'seramik' },
-    { n: 'Buldan ve Denizli', w: 'El tezgâhı dokuma', t: 'Pamuk peştemaller ve keten örtüler, ahşap tezgâhlarda metre metre dokunur.', c: 'tekstil' },
-    { n: 'Avanos', w: 'Kızılırmak kili', t: 'Çarkta çekilen sürahi ve kaplar; nehrin kırmızı kili, odun fırınında pişer.', c: 'seramik' },
-    { n: 'Gaziantep', w: 'Dövme bakır', t: 'Cezveler bakır levhadan elde dövülür, içi kalaylanır.', c: 'mutfak' },
-    { n: 'Nazarköy', w: 'Üflemeli cam', t: 'Nazarlıklar köyün fırınlarında, camın rengi elde katlanarak üflenir.', c: 'hediye' },
-  ];
-  function renderRegions() {
-    $('#regions').innerHTML = REGIONS.map(r => `<article class="region"><h3>${esc(r.n)}</h3><p class="what">${esc(r.w)}</p><p>${esc(r.t)}</p>
-      <button class="n" type="button" data-cat-go="${r.c}">${esc(CATS.find(c => c.id === r.c)?.name || '')} ürünlerini gör</button></article>`).join('');
-  }
-
-  /* ---------- Bildirim ---------- */
   let tt;
   function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('on'), 2200); }
 
@@ -170,21 +179,19 @@
   document.addEventListener('click', e => {
     const t = e.target.closest('button,a'); if (!t) return;
     if (t.dataset.cat) { e.preventDefault(); setCat(t.dataset.cat); if (t.tagName === 'A') $('#urunler').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' }); return; }
-    if (t.dataset.catGo) { setCat(t.dataset.catGo); $('#urunler').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' }); return; }
     if (t.dataset.open) return openDetail(t.dataset.open);
-    if (t.dataset.add) return add(t.dataset.add);
-    if (t.dataset.q) return setQty(t.dataset.q, (cart[t.dataset.q] || 0) + +t.dataset.d);
-    if (t.dataset.rm) { const p = byId(t.dataset.rm); setQty(t.dataset.rm, 0); return toast(`${p.name} sepetten çıkarıldı`); }
+    if (t.dataset.ci) { ci = +t.dataset.ci; return paintDetail(); }
+    if (t.dataset.size) { size = t.dataset.size; $('#dHint').textContent = ''; return paintDetail(); }
+    if (t.dataset.q) { const l = cart[+t.dataset.q]; l.q = Math.min(10, l.q + +t.dataset.d); if (l.q <= 0) cart.splice(+t.dataset.q, 1); save(); paintCount(); return renderCart(); }
+    if (t.dataset.rm) { const l = cart.splice(+t.dataset.rm, 1)[0]; save(); paintCount(); renderCart(); return toast(`${byId(l.id).name} sepetten çıkarıldı`); }
     if (t.hasAttribute('data-close')) { t.closest('dialog')?.close(); if (t.dataset.go) $('#' + t.dataset.go).scrollIntoView(); return; }
-    if (t.id === 'cartOpen') return openCart();
-    if (t.id === 'qMinus') { qty = Math.max(1, qty - 1); $('#qVal').textContent = qty; return; }
-    if (t.id === 'qPlus') { qty = Math.min(20, qty + 1); $('#qVal').textContent = qty; return; }
-    if (t.id === 'dAdd') { add(cur.id, qty); $('#detail').close(); return; }
-    if (t.id === 'checkout') { cart = {}; save(); paintCount(); done = true; renderCart(); return; }
+    if (t.id === 'cartOpen') { done = false; renderCart(); return $('#cart').showModal(); }
+    if (t.id === 'dAdd') { if (!size) { $('#dHint').textContent = 'Sepete eklemek için bir beden seçin.'; return $('#dSizes button')?.focus(); } add(cur.id, ci, size); return $('#detail').close(); }
+    if (t.id === 'checkout') { cart = []; save(); paintCount(); done = true; return renderCart(); }
   });
   document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close(); }));
   $('#sort').addEventListener('change', e => { sort = e.target.value; renderGrid(); });
 
-  hero(); renderCats(); renderGrid(); renderRegions();
+  rail(); renderCats(); renderGrid();
   $('#cartCount').textContent = count(); $('#cartOpen').setAttribute('aria-label', `Sepet, ${count()} ürün`);
 })();

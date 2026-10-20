@@ -1,23 +1,30 @@
-# DOĞU — örnek alışveriş sitesi
+# DOĞU — örnek giyim mağazası
 
-Anadolu el işi ev ve sofra ürünleri satan **örnek** bir markanın mağaza sitesi. Marka adı Doğan Ulusoy'dan türetildi (Doğ + U). Ürünler, fiyatlar ve atölyeler gösterim amaçlıdır; sipariş oluşturulmaz, ödeme alınmaz.
+Sade kesim, uzun ömürlü kıyafetler satan **örnek** bir giyim markasının alışveriş sitesi. Marka adı Doğan Ulusoy'dan türetildi (Doğ + U). Ürünler ve fiyatlar gösterim amaçlıdır; sipariş oluşturulmaz, ödeme alınmaz.
 
 ## Neler var
-- Ana sayfa: İznik çinisinden esinlenen yıldız-haç desenli giriş
-- Koleksiyon: kategori filtresi (Seramik ve çini, Mutfak ve kahve, Tekstil, Hediye) ve fiyat sıralaması
-- Ürün ayrıntısı: ölçü, teknik, adet seçimi
-- Sepet: adet değiştirme, ücretsiz kargo eşiği (1.500 ₺), örnek sipariş tamamlama
+- Ana sayfa: askılıkta asılı kıyafetlerle giriş
+- Koleksiyon: Dış giyim, Üst giyim, Alt giyim, Aksesuar filtresi ve fiyat sıralaması
+- Ürün ayrıntısı: renk ve beden seçimi, kumaş ve kesim bilgisi
+- Beden tablosu
+- Sepet: renk/beden bazında satırlar, adet değiştirme, 1.500 ₺ üzeri ücretsiz kargo, örnek sipariş tamamlama
 - Sepet tarayıcıda saklanır (localStorage)
 
 ## Dosyalar
 | Dosya | İçerik |
 | --- | --- |
-| `index.html` | Sayfa iskeleti |
-| `styles.css` | Renkler, yazı tipleri, düzen |
+| `index.html` | Sayfa iskeleti ve beden tablosu |
+| `styles.css` | Renkler (çivit, safran), Archivo yazı tipi, düzen |
 | `products.js` | Ürün ve kategori listesi — yeni ürün buraya eklenir |
-| `app.js` | Katalog, ürün ayrıntısı, sepet |
+| `app.js` | Kıyafet çizimleri, katalog, ürün ayrıntısı, sepet |
 
 Derleme adımı yoktur; dosyalar olduğu gibi yayınlanır (Vercel, GitHub Pages veya herhangi bir statik sunucu).
 
 ## Yeni ürün eklemek
-`products.js` içindeki listeye bir satır ekleyin. `motif` şunlardan biri olabilir: `yildiz`, `lale`, `cintemani`, `dalga`, `gul`, `cizgi`, `elibelinde`, `nar`, `nazar`. `colors` üç renk alır: zemin, çerçeve, vurgu.
+`products.js` içindeki listeye bir kayıt ekleyin:
+- `type`: `coat`, `jacket`, `shirt`, `tee`, `knit`, `hoodie`, `trousers`, `skirt`, `scarf`, `beanie`
+- `fabric`: `solid`, `stripe`, `check`, `rib`, `denim`
+- `colors`: `{ name, hex }` listesi; çizgili/ekose için ikinci renk `alt`
+- `sizes`: beden listesi; tek bedenli ürünlerde `['Tek beden']`
+
+Gerçek ürün fotoğrafları eklendiğinde `app.js` içindeki `art()` fonksiyonu bir `<img>` döndürecek şekilde değiştirilebilir.
