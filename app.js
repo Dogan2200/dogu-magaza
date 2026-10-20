@@ -11,7 +11,7 @@
   let uid = 0;
 
   /* ---------- Kıyafet çizimleri (düz illüstrasyon, 400×500) ---------- */
-  const LINE = 'stroke="rgba(0,0,0,.22)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"';
+  const LINE = 'stroke="rgba(0,0,0,.2)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"';
   function fabric(id, f, c) {
     const hex = c.hex, alt = c.alt || '#ffffff';
     const P = (w, h, body) => `<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">${body}</pattern>`;
@@ -74,16 +74,16 @@
   /* Hero: askılıkta asılı kıyafetler, açılışta bir kez sallanır */
   function rail() {
     const el = $('#rail'); if (!el) return;
-    const picks = [['civit-trenc', 0], ['balikci-triko', 2], ['keten-gomlek', 0], ['denim-ceket', 0], ['yun-kaban', 1], ['pileli-etek', 0], ['agir-tisort', 2]];
+    const picks = [['civit-trenc', 1], ['balikci-triko', 0], ['keten-gomlek', 0], ['yun-kaban', 1], ['pileli-etek', 0], ['agir-tisort', 1]];
     const W = 1200, n = picks.length, gap = W / n;
     let s = `<style>@keyframes sway{0%{transform:rotate(0)}25%{transform:rotate(3deg)}55%{transform:rotate(-2deg)}80%{transform:rotate(1deg)}100%{transform:rotate(0)}}</style>
-      <rect x="0" y="22" width="${W}" height="8" rx="4" fill="#262d63"/>`;
+      <rect x="0" y="24" width="${W}" height="3" fill="#16171c"/>`;
     picks.forEach(([id, ci], i) => {
       const p = P.find(x => x.id === id); if (!p) return;
-      const cx = gap * i + gap / 2, sc = .62, d = reduce ? '' : `animation:sway 2.4s ${i * 90}ms cubic-bezier(.3,.6,.3,1) both;`;
+      const cx = gap * i + gap / 2, sc = .6, d = reduce ? '' : `animation:sway 2.4s ${i * 90}ms cubic-bezier(.3,.6,.3,1) both;`;
       s += `<g class="hang" style="transform-origin:${cx}px 26px;${d}">
-        <path d="M${cx} 26 v10 q0 8 -8 8" fill="none" stroke="#5b5f6b" stroke-width="3" stroke-linecap="round"/>
-        <path d="M${cx - 62} 78 L${cx} 44 L${cx + 62} 78" fill="none" stroke="#5b5f6b" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="M${cx} 26 v10 q0 8 -8 8" fill="none" stroke="#8a8d96" stroke-width="2" stroke-linecap="round"/>
+        <path d="M${cx - 62} 78 L${cx} 44 L${cx + 62} 78" fill="none" stroke="#8a8d96" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
         <g transform="translate(${cx - 200 * sc} ${16}) scale(${sc})">${art(p, ci, { bg: false, decorative: true }).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</g></g>`;
     });
     el.innerHTML = s;
